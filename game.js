@@ -328,6 +328,27 @@ function drawCircle(x, y, radius, fill, stroke, strokeWidth, opacity, absolute) 
     ctx.globalAlpha = 1.0;
 };
 
+function renderCircle(x, y, radius, style, absolute) { // draw a circle
+    var canvas = document.getElementById('main');
+    var ctx = canvas.getContext("2d");
+    ctx.resetTransform();
+    ctx.beginPath();
+    if (absolute) {
+        ctx.arc(x*data.constants.zoom, y*data.constants.zoom, radius*data.constants.zoom, 0, 2 * Math.PI, false);
+    } else {
+        ctx.arc((-player.x+x)*data.constants.zoom+display.x/2, (-player.y+y)*data.constants.zoom+display.y/2, radius*data.constants.zoom, 0, 2 * Math.PI, false);
+    }
+    if (style.fill) {
+        ctx.fillStyle = style.fill;
+        ctx.fill();
+    }
+    if (style.stroke) {
+        ctx.lineWidth = style.stroke.width*data.constants.zoom;
+        ctx.strokeStyle = style.stroke.colour;
+        ctx.stroke();
+    }
+};
+
 function displaytxt(txt, pos) {
     var canvas = document.getElementById("canvasOverlay");
     var ctx = canvas.getContext("2d");
@@ -352,6 +373,46 @@ function rotatePolygon(point, r) {
 };
 
 function drawPolygon(point, offset, r, style, absolute, debug=false) {
+    let points = JSON.parse(JSON.stringify(point));
+    if (points.length < 3) {
+        throw "Error: Your polygon needs to have at least 3 points dumbass";
+    }
+    points = rotatePolygon(points, r)
+    var canvas = document.getElementById('main');
+    var ctx = canvas.getContext("2d");
+    ctx.resetTransform();
+    ctx.beginPath();
+    if (absolute) {
+        ctx.moveTo((points[0].x + offset.x)*data.constants.zoom, (points[0].y + offset.y)*data.constants.zoom);
+        if (debug) {displaytxt(`(${Math.round((points[0].x + offset.x)*data.constants.zoom)}, ${Math.round((points[0].y + offset.y)*data.constants.zoom)})`, {x: (points[0].x + offset.x)*data.constants.zoom, y: (points[0].y + offset.y)*data.constants.zoom});}
+    } else {
+        ctx.moveTo((points[0].x-player.x + offset.x)*data.constants.zoom+display.x/2, (points[0].y-player.y + offset.y)*data.constants.zoom+display.y/2);
+        if (debug) {displaytxt(`(${Math.round((points[0].x-player.x + offset.x)*data.constants.zoom+display.x/2)}, ${Math.round((points[0].y-player.y + offset.y)*data.constants.zoom+display.y/2)})`, {x: (points[0].x-player.x + offset.x)*data.constants.zoom+display.x/2, y: (points[0].y-player.y + offset.y)*data.constants.zoom+display.y/2});}
+        //if (debug) {displaytxt(`(${Math.round(points[0].x-player.x+display.x/2 + offset.x)}, ${Math.round(points[0].y-player.y+display.y/2 + offset.y)})`, {x: points[0].x-player.x+display.x/2 + offset.x, y: points[0].y-player.y+display.y/2 + offset.y});}
+    }
+    for (let i = 1; i < points.length; i++) {
+        if (absolute) {
+            ctx.lineTo((points[i].x + offset.x)*data.constants.zoom, (points[i].y + offset.y)*data.constants.zoom);
+            if (debug) {displaytxt(`(${Math.round((points[i].x + offset.x)*data.constants.zoom)}, ${Math.round((points[i].y + offset.y)*data.constants.zoom)})`, {x: (points[i].x + offset.x)*data.constants.zoom, y: (points[i].y + offset.y)*data.constants.zoom});}
+        } else {
+            ctx.lineTo((points[i].x-player.x + offset.x)*data.constants.zoom+display.x/2, (points[i].y-player.y + offset.y)*data.constants.zoom+display.y/2);
+            if (debug) {displaytxt(`(${Math.round((points[i].x-player.x + offset.x)*data.constants.zoom+display.x/2)}, ${Math.round((points[i].y-player.y + offset.y)*data.constants.zoom+display.y/2)})`, {x: (points[i].x-player.x + offset.x)*data.constants.zoom+display.x/2, y: (points[i].y-player.y + offset.y)*data.constants.zoom+display.y/2});}
+            //if (debug) {displaytxt(`(${Math.round(points[i].x-player.x+display.x/2 + offset.x)}, ${Math.round(points[i].y-player.y+display.y/2 + offset.y)})`, {x: points[i].x-player.x+display.x/2 + offset.x, y: points[i].y-player.y+display.y/2 + offset.y});}
+        }
+    }
+    ctx.closePath();
+    if (style.fill) {
+        ctx.fillStyle = style.fill;
+        ctx.fill();
+    }
+    if (style.stroke) {
+        ctx.lineWidth = style.stroke.width*data.constants.zoom;
+        ctx.strokeStyle = style.stroke.colour;
+        ctx.stroke();
+    }
+};
+
+function renderPolygon(point, offset, r, style, absolute, debug=false) {
     let points = JSON.parse(JSON.stringify(point));
     if (points.length < 3) {
         throw "Error: Your polygon needs to have at least 3 points dumbass";
@@ -607,22 +668,31 @@ function vMath(v1, v2, mode) {
         case '.': 
         case 'dot product': 
             return v1.x * v2.x + v1.y * v2.y;
-        case 'cross product': // chat gpt, I believe in you (I doubt this is correct)
-            return v1.x * v2.y - v1.y * v2.x;
         case 'projection':
         case 'vector resolute':
-        return vMath(v2, vMath(v1, v2, '.')/vMath(v2, null, '||')**2, 'x');
+            return vMath(v2, vMath(v1, v2, '.')/vMath(v2, null, '||')**2, 'x');
+        case '=':
+        case 'replace': // used when replacing position of one object with another 
+            v1.x = v2.x;
+            v1.y = v2.y;
+            return v1;
+        case '==': // check if 2 vectors equal
+            return v1.x == v2.x && v1.y == v2.y;
         default:
             throw 'what are you trying to do to to that poor vector?';
     }
 };
 
 function toComponent(m, r) {
-    return {x: m * Math.sin(r), y: -m * Math.cos(r)};
+    return {x: m * Math.cos(r), y: m * Math.sin(r)};
 };
 
 function toPol(i, j) {
     return {m: Math.sqrt(i**2+j**2), r: aim({x: 0, y: 0}, {x: i, y: j})};
+};
+
+function toCoords(coords) {
+    return `(${coords.x}, ${coords.y})`;
 };
 
 function circleToPolygon(pos, r, sides) {
@@ -632,6 +702,10 @@ function circleToPolygon(pos, r, sides) {
         polygon.push(vMath(toComponent(r, step*i),pos,'add'));
     }
     return polygon;
+};
+
+function copy(thing) {
+    return JSON.parse(JSON.stringify(thing));
 };
 
 // The return of the excessively overcomplicated data storage system
@@ -680,15 +754,22 @@ const data = {
                 group: 'enemy',
                 hp: 1,
                 v: 5,
-                type: 'circle',
-                size: 40,
-                style: {
-                    fill: 'rgba(0, 0, 255, 0.25)',
-                    stroke: {colour: '#696969', width: 10},
-                },
-                offset: {x: 0, y: 0},
-                rOffset: 0,
-                absolute: false,
+                hitbox: [
+
+                ],
+                parts: [
+                    {
+                        type: 'circle',
+                        size: 40,
+                        style: {
+                            fill: 'rgba(180, 180, 180, 1)',
+                            stroke: {colour: 'rgba(150, 150, 150, 1)', width: 10},
+                        },
+                        offset: {x: 0, y: 0},
+                        rOffset: 0,
+                        absolute: false,
+                    }
+                ]
             },
         }
     },
@@ -787,8 +868,7 @@ if (savedPlayer !== null) {
 } else {
     // No saved data found
     console.log('no save found, creating new player');
-    player = JSON.parse(JSON.stringify(data.player));
-    entities.push(player);
+    player = copy(data.player);
 };
 
 // Steal Data (get inputs)
@@ -941,17 +1021,21 @@ function renderPart(unit, part) {
 };
 
 function renderUnit(unit) {
-    unit.parts = recursiveParts(unit, unit.parts, renderPart);
-    if (unit.collisionR > 0 && false) {
-        drawCircle(display.x/2 - player.x + unit.x, display.y/2 - player.y + unit.y, unit.collisionR, 'rgba(255, 255, 255, 0.1)', 'rgba(255, 0, 0, 0.9)', 5, 1);
+    for (let i = 0; i < unit.parts.length; i++) {
+        switch (unit.parts[i].type) {
+            case 'polygon':
+                console.warn(`WARNING: polygon rendering is currently unsupported`);
+                break;
+            case 'circle':
+                console.log(unit);
+                renderCircle(unit.x + unit.parts[i].offset.x, unit.y + unit.parts[i].offset.y, unit.parts[i].size, unit.parts[i].style, false);
+                //renderCircle(unit.x, unit.y, 50, data.red, false)
+                break;
+            case 'text':
+                console.warn(`WARNING: text rendering is currently unsupported`);
+                break;
+        }
     }
-    if (unit.groundCollisionR > 0) {
-        drawCircle(unit.x, unit.y, unit.groundCollisionR, 'rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0.1)', 5, 1, false);
-    }
-    if (unit.tallCollisionR > 0) {
-        drawCircle(unit.x, unit.y, unit.tallCollisionR, 'rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0.1)', 5, 1, false);
-    }
-    //drawLine(unit, aim(unit, unit.aimPos)-Math.PI/2, 1500, data.red.stroke, false);
 };
 
 function shoot(unit, part) {
@@ -1038,23 +1122,41 @@ function renderDecorative(obj) {
     }
 }
 
+function moveTo(obj, pos) {
+    obj.r = aim(obj, pos);
+    if (getDist(obj, pos) < obj.v) {
+        obj.vx = pos.x - obj.x;
+        obj.vy = pos.y - obj.y;
+        obj = vMath(obj, pos, '=');
+    } else {
+        let r = aim(obj, pos);
+        let v = toComponent(obj.v, r);
+        console.log(v);
+        obj.vx = v.x;
+        obj.vy = v.y;
+        obj = vMath(obj, vMath(obj, v, '+'), '=');
+    }
+    return obj;
+};
+
 function handleEnemyMotion(enemy) {
     if (enemy.path.length > 0) {
-        if (getDist(enemy, enemy.path[0]) < enemy.v) {
-            enemy.x = enemy.path[0].x;
-            enemy.y = enemy.path[0].y;
-        } else {
-            let r = aim(enemy, enemy.path[0]);
-            let v = toComponent(enemy.v, r);
+        console.log(enemy.x, enemy.y, enemy.path[0]);
+        enemy = moveTo(enemy, enemy.path[0]);
+        if (vMath(enemy, enemy.path[0], '==')) {
+            enemy.path.shift();
         }
     } else {
-        console.warn(`WARNING: Enemy ${enemy.id} has no path!`);
+        console.warn(`WARNING: Enemy ${enemy.id} at ${toCoords(enemy)} has no path!`);
     }
+    return enemy;
 }
 
 function physics() {
     handlePlayerMotion();
-    handleEnemyMotion();
+    for (let i = 0; i < enemies.length; i++) {
+        enemies[i] = handleEnemyMotion(enemies[i]);
+    }
 };
 
 function graphics(step) {
@@ -1070,6 +1172,9 @@ function graphics(step) {
             drawLine(track.path[i], aim(track.path[i], track.path[i-1]), getDist(track.path[i], track.path[i-1]), data.black, false);
         }
     }
+    for (let i = 0; i < enemies.length; i++) {
+        renderUnit(enemies[i]);
+    }
     player.x += player.vx*(1-step/FPT);
     player.y += player.vy*(1-step/FPT);
 };
@@ -1082,7 +1187,7 @@ function main() {
     graphics(t%FPT);
     t++;
     const end = performance.now();
-    console.log(`Processing Time: ${end-start}ms, max: ${1000/FPS}ms for ${FPS}fps. Max Possible FPS: ${1000/(end-start)}`);
+    //console.log(`Processing Time: ${end-start}ms, max: ${1000/FPS}ms for ${FPS}fps. Max Possible FPS: ${1000/(end-start)}`);
 };
 
 var t=0
@@ -1091,6 +1196,11 @@ const TPS = data.constants.TPS;
 const FPS = data.constants.FPS;
 const FPT = FPS/TPS;
 async function game() {
+    let sampleEnemy = Object.assign({}, JSON.parse(JSON.stringify(data.template.enemies.weakling)), JSON.parse(JSON.stringify(data.template.enemy)));
+    sampleEnemy.path = copy(track.path);
+    sampleEnemy = vMath(sampleEnemy, track.path[0], '=');
+    console.log(sampleEnemy);
+    enemies.push(sampleEnemy);
     while (1) {
         if (paused == false) {
             if (main()) {

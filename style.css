@@ -75,7 +75,7 @@ body {
 
 #overlay {
     font-size: 40px; 
-    display: flex;
+    display: none;
     justify-content: space-between;
     zoom: 100%;
 }
